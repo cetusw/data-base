@@ -1,0 +1,554 @@
+show tables;
+
+drop table image_block;
+
+#1.1###########################################################################################################
+
+# Основные таблицы
+
+CREATE TABLE news (
+    news_id BINARY(16) NOT NULL ,
+    title VARCHAR(100) NOT NULL,
+    is_draft TINYINT NOT NULL DEFAULT 1,
+    block_id_with_image INT UNSIGNED NOT NULL,
+    PRIMARY KEY (news_id)
+)
+    ENGINE = InnoDB
+    CHARACTER SET = utf8mb4
+    COLLATE utf8mb4_unicode_ci
+;
+
+CREATE TABLE news_block (
+    block_id INT UNSIGNED AUTO_INCREMENT,
+    order_number INT UNSIGNED NOT NULL,
+    news_id BINARY(16) NOT NULL,
+    PRIMARY KEY (block_id),
+    CONSTRAINT news_id_fk FOREIGN KEY (news_id) REFERENCES news (news_id) ON DELETE CASCADE,
+    UNIQUE KEY (news_id, order_number)
+)
+    ENGINE = InnoDB
+    CHARACTER SET = utf8mb4
+    COLLATE utf8mb4_unicode_ci
+;
+
+CREATE TABLE paragraph_block (
+    block_id INT UNSIGNED,
+    paragraph TEXT NOT NULL,
+    PRIMARY KEY (block_id),
+    CONSTRAINT paragraph_block_id_fk FOREIGN KEY (block_id) REFERENCES news_block (block_id) ON DELETE CASCADE
+)
+    ENGINE = InnoDB
+    CHARACTER SET = utf8mb4
+    COLLATE utf8mb4_unicode_ci
+;
+
+CREATE TABLE image_block (
+    block_id INT UNSIGNED,
+    image_src VARCHAR(255) NOT NULL,
+    PRIMARY KEY (block_id),
+    CONSTRAINT image_block_id_fk FOREIGN KEY (block_id) REFERENCES news_block (block_id) ON DELETE CASCADE
+)
+    ENGINE = InnoDB
+    CHARACTER SET = utf8mb4
+    COLLATE utf8mb4_unicode_ci
+;
+
+CREATE TABLE comment (
+    comment_id INT UNSIGNED AUTO_INCREMENT,
+    text TEXT NOT NULL,
+    news_id BINARY(16) NOT NULL,
+    comment_ip VARCHAR(39) NOT NULL,
+    thread_id INT UNSIGNED DEFAULT NULL,
+    deleted_at TIMESTAMP DEFAULT NULL,
+    PRIMARY KEY (comment_id),
+    CONSTRAINT news_id_comment_fk FOREIGN KEY (news_id) REFERENCES news (news_id) ON DELETE CASCADE,
+    FOREIGN KEY (thread_id) REFERENCES comment (comment_id) ON DELETE CASCADE
+)
+    ENGINE = InnoDB
+    CHARACTER SET = utf8mb4
+    COLLATE utf8mb4_unicode_ci
+;
+
+CREATE TABLE news_view (
+    news_id BINARY(16) NOT NULL,
+    user_ip VARCHAR(39) NOT NULL,
+    date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (news_id, user_ip),
+    CONSTRAINT news_id_view_fk FOREIGN KEY (news_id) REFERENCES news (news_id) ON DELETE CASCADE
+)
+    ENGINE = InnoDB
+    CHARACTER SET = utf8mb4
+    COLLATE utf8mb4_unicode_ci
+;
+
+# Два новых отношения
+
+CREATE TABLE author (
+    author_id BINARY(16) NOT NULL,
+    firstname VARCHAR(100) NOT NULL,
+    surname VARCHAR(100) NOT NULL,
+    secondname VARCHAR(100) DEFAULT NULL,
+    email VARCHAR(255) NOT NULL,
+    bio TEXT DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (author_id),
+    UNIQUE KEY (email)
+)
+    ENGINE = InnoDB
+    CHARACTER SET = utf8mb4
+    COLLATE utf8mb4_unicode_ci
+;
+
+CREATE TABLE category (
+    category_id INT UNSIGNED AUTO_INCREMENT,
+    name VARCHAR(100) NOT NULL,
+    description TEXT NOT NULL,
+    PRIMARY KEY (category_id),
+    UNIQUE KEY (name)
+)
+    ENGINE = InnoDB
+    CHARACTER SET = utf8mb4
+    COLLATE utf8mb4_unicode_ci
+;
+
+# Добавление новых полей в таблицу
+
+ALTER TABLE news
+    ADD COLUMN author_id BINARY(16) NOT NULL AFTER news_id,
+    ADD category_id INT UNSIGNED DEFAULT NULL AFTER author_id,
+    ADD COLUMN published_at TIMESTAMP NULL DEFAULT NULL AFTER block_id_with_image,
+    ADD CONSTRAINT fk_news_author FOREIGN KEY (author_id) REFERENCES author (author_id) ON DELETE CASCADE,
+    ADD CONSTRAINT fk_news_category FOREIGN KEY (category_id) REFERENCES category (category_id) ON DELETE SET NULL
+;
+
+#2.1################################################################################################
+
+UPDATE news
+SET
+    published_at=NOW()
+WHERE
+    title='Заголовок';
+
+
+
+## INSERT IGNORE
+INSERT IGNORE INTO
+    author (author_id, firstname, surname, email)
+VALUES
+    (
+    UNHEX(REPLACE('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', '-', '')),
+    'Иван',
+    'Иванов',
+    'ivan.ivanov@gmail.com'
+    );
+
+DELETE FROM
+    author
+WHERE
+    author_id = UNHEX(REPLACE('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', '-', ''));
+
+
+START TRANSACTION;
+INSERT IGNORE INTO
+    author (author_id, firstname, surname, email)
+VALUES
+    (
+        UNHEX(REPLACE(UUID(), '-', '')),
+        'Петя',
+        'Петров',
+        'firstname.surname3@gmail.com'
+    );
+SELECT * FROM author;
+COMMIT;
+
+
+INSERT IGNORE INTO
+    news (news_id, title, is_draft, block_id_with_image, author_id, category_id)
+VALUES
+    (
+        UNHEX(REPLACE(UUID(), '-', '')),
+     'Заголовок',
+     0,
+     1,
+     UNHEX(REPLACE('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', '-', '')),
+     4
+    );
+
+DELETE FROM
+    news
+WHERE
+    news_id = UNHEX(REPLACE('7e8a9448-d815-4069-8d5e-03ef1e614063', '-', ''));
+
+
+INSERT IGNORE INTO
+    news_block (order_number, news_id)
+VALUES
+    (4, UNHEX(REPLACE('0604570d-2193-11f0-b105-0242ac120002', '-', '')));
+
+DELETE FROM
+    news_block
+WHERE
+    news_id = UNHEX(REPLACE('7e8a9448-d815-4069-8d5e-03ef1e614063', '-', ''));
+
+
+INSERT IGNORE INTO
+    paragraph_block (block_id, paragraph)
+VALUES
+    (3, 'Текст абзаца');
+
+DELETE FROM
+    paragraph_block
+WHERE
+    block_id = 1;
+
+
+INSERT IGNORE INTO
+    image_block (block_id, image_src)
+VALUES
+    (3, 'news1.jpg');
+
+DELETE FROM
+    image_block
+WHERE
+    block_id = 1;
+
+SELECT * FROM news;
+
+INSERT IGNORE INTO
+    news_view (news_id, user_ip)
+VALUES
+    (
+     UNHEX(REPLACE('ca6bf44c-2561-11f0-a777-0242ac120002', '-', '')),
+     '255.122.119.223'
+    );
+
+DELETE FROM
+    news_view
+WHERE
+    news_id = UNHEX(REPLACE('04feb896-2193-11f0-b105-0242ac120002', '-', ''))
+AND
+    user_ip = '183.187.183.225';
+
+## ON DUPLICATE KEY UPDATE
+# Обновить блок картинки
+START TRANSACTION;
+INSERT INTO
+    image_block (block_id, image_src)
+VALUES
+    (
+     3,
+     'new_news.jpg'
+    )
+ON DUPLICATE KEY UPDATE
+    image_src = VALUES(image_src);
+SELECT * FROM image_block;
+COMMIT;
+
+
+# Обновить блок абзаца
+START TRANSACTION;
+INSERT INTO
+    paragraph_block (block_id, paragraph)
+VALUES
+    (
+        3,
+        'Абзац машина'
+    )
+ON DUPLICATE KEY UPDATE
+    paragraph = VALUES(paragraph);
+SELECT * FROM paragraph_block;
+COMMIT;
+
+
+# Обновить блок новости
+START TRANSACTION;
+INSERT INTO
+    news_block (news_id, order_number)
+VALUES
+    (
+        UNHEX(REPLACE('0604570d-2193-11f0-b105-0242ac120002', '-', '')),
+        3
+    )
+ON DUPLICATE KEY UPDATE
+    order_number = VALUES(order_number);
+SELECT * FROM news_block;
+COMMIT;
+
+START TRANSACTION;
+INSERT INTO category (name, description)
+VALUES (
+           'Что-то ещё 2',
+           'Новости о экономических событиях'
+       )
+ON DUPLICATE KEY UPDATE
+    name = VALUES(name);
+SELECT * FROM category;
+COMMIT;
+
+
+START TRANSACTION;
+INSERT INTO comment (text, news_id, comment_ip, thread_id)
+VALUES (
+           'комментарий',
+           UNHEX(REPLACE('cc5cb07d-2561-11f0-a777-0242ac120002', '-', '')),
+           '183.187.183.131',
+            41
+       )
+ON DUPLICATE KEY UPDATE
+    text = VALUES(text);
+SELECT * FROM category;
+COMMIT;
+
+
+## UPDATE
+#author
+START TRANSACTION;
+UPDATE author
+SET
+    firstname = 'Иван',
+    surname = 'Иванов'
+WHERE
+    author_id = UNHEX(REPLACE('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', '-', ''));
+SELECT * FROM author;
+COMMIT;
+
+
+# category
+START TRANSACTION;
+UPDATE category
+SET
+    name = 'Экономика'
+WHERE
+    category_id = 2;
+SELECT * FROM category;
+ROLLBACK;
+
+
+START TRANSACTION;
+UPDATE category
+SET
+    description = 'Новое описание'
+WHERE
+    category_id = 2;
+ROLLBACK;
+
+
+# comment
+START TRANSACTION;
+UPDATE
+    comment
+SET
+    text = 'Обновленный комментарий 1234'
+WHERE
+    comment_id = 2;
+SELECT * FROM comment;
+ROLLBACK;
+
+
+START TRANSACTION;
+UPDATE comment
+SET
+    deleted_at = NOW()
+WHERE
+    comment_id = 1;
+SELECT * FROM comment;
+COMMIT;
+
+
+# image_block
+START TRANSACTION;
+UPDATE image_block
+SET
+    image_src = '/news987654321.jpg'
+WHERE
+    block_id = 3;
+SELECT * FROM image_block;
+COMMIT;
+
+
+START TRANSACTION;
+UPDATE image_block
+SET
+    block_id = 6
+WHERE
+    image_src = '/news987654321.jpg';
+SELECT * FROM image_block;
+COMMIT;
+
+
+# news
+START TRANSACTION;
+UPDATE
+    news
+SET
+    title = 'Новый заголовок',
+    is_draft = 0
+WHERE
+    news_id = UNHEX(REPLACE('7e8a9448-d815-4069-8d5e-03ef1e614063', '-', ''));
+SELECT * FROM news;
+COMMIT;
+
+
+#3.1#############################################################################################################
+
+#Извлечь все опубликованные новости
+EXPLAIN ANALYZE
+SELECT title, author_id, category_id, published_at FROM news WHERE published_at IS NOT NULL;
+
+#Извлечь информацию о миниатюре конкретной новости по идентификатору новости
+EXPLAIN ANALYZE
+SELECT ib.image_src
+FROM news_block nb
+    INNER JOIN image_block ib ON nb.block_id = ib.block_id
+WHERE news_id=UNHEX(REPLACE('7e8a9448-d815-4069-8d5e-03ef1e614063', '-', ''))
+ORDER BY order_number
+LIMIT 1;
+
+#Извлеките все ip адреса, с которых были просмотры
+EXPLAIN ANALYZE
+SELECT DISTINCT user_ip FROM news_view;
+
+#Извлечь информацию для отображения конкретной новости целиком в портале пользователя
+EXPLAIN ANALYZE
+SELECT n.title, cat.name, ib.image_src, pb.paragraph, a.firstname, a.surname, n.published_at FROM news n
+    INNER JOIN news_block nb ON n.news_id = nb.news_id
+    INNER JOIN paragraph_block pb ON n.news_id = nb.news_id
+    INNER JOIN image_block ib ON n.news_id = nb.news_id
+    INNER JOIN author a ON n.author_id = a.author_id
+    INNER JOIN comment c ON n.news_id = c.news_id
+    INNER JOIN category cat ON n.category_id = cat.category_id
+WHERE n.news_id=UNHEX(REPLACE('0604570d-2193-11f0-b105-0242ac120002', '-', '')) AND n.published_at IS NOT NULL;
+
+#Извлечь ТОП 5 самых просматриваемых новостей.
+EXPLAIN ANALYZE
+SELECT n.title, COUNT(*) AS views
+FROM news_view nv
+    INNER JOIN news n ON nv.news_id = n.news_id
+GROUP BY n.news_id
+ORDER BY views DESC
+LIMIT 5;
+
+#Извлечь все новости, которые просматривали после конкретной даты (дату придумаете сами).
+EXPLAIN ANALYZE
+SELECT n.title, nv.date
+FROM news_view nv
+    INNER JOIN news n ON nv.news_id = n.news_id
+WHERE DATE(nv.date) > '2025-04-25';
+
+#Найти новости с наибольшим количеством блоков контента
+EXPLAIN ANALYZE
+SELECT n.title, COUNT(*) AS count_blocks
+FROM news_block nb
+    INNER JOIN news n ON nb.news_id = n.news_id
+GROUP BY n.news_id
+ORDER BY count_blocks DESC
+LIMIT 1;
+
+#Извлечь ТОП 5 самых комментируемых новостей.
+EXPLAIN ANALYZE
+SELECT n.title, COUNT(*) AS count_comments
+FROM comment c
+    INNER JOIN news n ON c.news_id = n.news_id
+GROUP BY n.news_id
+ORDER BY count_comments DESC
+LIMIT 5;
+
+#Извлечь даты, в которые новости (учитывать все новости) просматривались наиболее часто.
+EXPLAIN ANALYZE
+SELECT DATE(date) view_date, COUNT(*) count_views
+FROM news_view
+GROUP BY view_date
+ORDER BY count_views DESC
+LIMIT 5;
+
+#Реализовать поиск по новостям: поиск должен быть на вхождение по названию новости или текстового
+#контента новости. Например, при поиске слова `машина` должны извлекаться все новости с упоминанием
+#этого слова в названии или контенте новости.
+EXPLAIN ANALYZE
+SELECT n.title, pb.paragraph
+FROM news n
+    INNER JOIN news_block nb ON n.news_id = nb.news_id
+    INNER JOIN paragraph_block pb ON nb.block_id = pb.block_id
+WHERE n.title LIKE '%машина%' OR pb.paragraph LIKE '%машина%';
+
+#Придумать запрос с новыми сущностями с использованием HAVING
+EXPLAIN ANALYZE
+SELECT c.name, COUNT(n.news_id) AS news_count
+FROM category c
+         JOIN news n ON c.category_id = n.category_id
+GROUP BY c.category_id
+HAVING news_count > 0;
+
+#Найти комментарий, у которого больше всего вложенных ответов (вглубь).
+EXPLAIN ANALYZE
+WITH RECURSIVE comment_depth AS (
+    SELECT
+        c.comment_id root_id,
+        c.comment_id,
+        c.thread_id,
+        0 depth
+    FROM comment c
+    WHERE c.thread_id IS NULL
+
+    UNION ALL
+
+    SELECT
+        cd.root_id,
+        c.comment_id,
+        c.thread_id,
+        depth + 1
+    FROM comment c
+        INNER JOIN comment_depth cd ON c.thread_id = cd.comment_id
+)
+
+SELECT
+    cd.root_id AS comment_id,
+    depth
+FROM comment_depth cd
+ORDER BY depth DESC
+LIMIT 1;
+
+
+UPDATE comment
+SET
+    thread_id = 60
+WHERE
+    comment_id = 10;
+
+
+#Найти зацикливание в дереве комментариев (перед этим создать зацикливание)
+EXPLAIN ANALYZE
+WITH RECURSIVE comment_path AS (
+    SELECT
+        c.comment_id,
+        c.thread_id,
+        CAST(comment_id AS CHAR(1024)) path,
+        0  has_cycle
+    FROM comment c
+    WHERE thread_id IS NOT NULL
+
+    UNION ALL
+
+    SELECT
+        c.comment_id,
+        c.thread_id,
+        CONCAT(cp.path, ',', c.comment_id),
+        IF(FIND_IN_SET(c.comment_id, cp.path) > 0, 1, 0) as has_cycle
+    FROM comment c
+        INNER JOIN comment_path cp ON c.thread_id = cp.comment_id
+    WHERE
+        cp.has_cycle = 0
+)
+
+SELECT
+    path
+FROM comment_path cp
+WHERE cp.has_cycle = 1;
+
+
+
+UPDATE comment
+SET
+    thread_id = 2
+WHERE
+    comment_id = 3;
