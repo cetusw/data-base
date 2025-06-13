@@ -20,7 +20,7 @@ FROM user u
     AND qq.question_type = 'SQAV'
 WHERE u.state = 'ACTIVE'
   AND c.deleted_at IS NULL
-  AND c.name = 'Course 32'
+  AND c.name = 'Course 51'
   AND q.state = 'READY'
   AND ((qq.question_type = 'MCQAV' AND qaa.answer_value = mcqav.value AND mcqav.is_correct = 1)
     OR (qq.question_type = 'SQAV' AND qaa.answer_value = sqav.value AND qaa.answer_value_order = sqav.value_order));
@@ -46,10 +46,10 @@ WHERE qaa.answer_value = '';
 # кто проходит квизы лучше. Сделать в единый SQL запрос
 
 SELECT IF(fired_avg > active_avg,
-          'FIRED users answered more questions correctly before 2025.',
+          'FIRED users answered more questions correctly before 2025',
           IF(active_avg > fired_avg,
-             'ACTIVE users answered more questions correctly in 2025.',
-             'Both user groups performed equally.')
+             'ACTIVE users answered more questions correctly in 2025',
+             'Both user groups performed equally')
        )                    AS comparison_result,
        ROUND(fired_avg, 2)  AS avg_correct_fired,
        ROUND(active_avg, 2) AS avg_correct_active
