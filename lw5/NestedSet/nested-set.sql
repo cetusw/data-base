@@ -35,7 +35,6 @@ SET GLOBAL log_bin_trust_function_creators = 1;
 
 CREATE FUNCTION subtree_size(dir_name VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci)
     RETURNS INT
-    DETERMINISTIC
 BEGIN
     DECLARE l INT;
     DECLARE r INT;
@@ -104,9 +103,7 @@ BEGIN
     SELECT rgt, depth
     INTO parent_rgt, parent_depth
     FROM directory
-    WHERE id = parent_id
-        FOR
-    UPDATE;
+    WHERE id = parent_id;
 
     UPDATE directory
     SET rgt = rgt + 2
@@ -131,6 +128,7 @@ CALL AddDirectory(1, 'New Folder 3');
 CALL AddDirectory(2, 'New Folder 4');
 CALL AddDirectory(2, 'New Folder 5');
 CALL AddDirectory(3, 'New Folder 6');
+CALL AddDirectory(3, 'New Folder 7');
 
 # 7. Удаление 2 элементов
 
@@ -146,9 +144,7 @@ BEGIN
     SELECT rgt, lft
     INTO dir_rgt, dir_lft
     FROM directory
-    WHERE name = dir_name
-        FOR
-    UPDATE;
+    WHERE name = dir_name;
 
     UPDATE directory
     SET rgt   = rgt - 1,
@@ -178,6 +174,86 @@ CALL DeleteDirectory('New Folder 3');
 ROLLBACK;
 
 # 8. Перемещение элемента в другое поддерево
+CREATE FUNCTION GetDirLeft(dir_id INT)
+    RETURNS INT
+    DETERMINISTIC
+BEGIN
+    DECLARE lft INT;
+
+    SELECT d.lft
+    INTO lft
+    FROM directory d
+    WHERE id = dir_id;
+
+    RETURN lft;
+END;
+
+CREATE FUNCTION GetDirRight(dir_id INT)
+    RETURNS INT
+    DETERMINISTIC
+BEGIN
+    DECLARE rgt INT;
+
+    SELECT d.rgt
+    INTO rgt
+    FROM directory d
+    WHERE name = dir_id;
+
+    RETURN rgt;
+END;
+
+DROP FUNCTION GetDirRight;
+
+CREATE PROCEDURE MoveDirectory(
+    IN moving_dir INT,
+    IN new_parent_id INT
+)
+BEGIN
+    SET @dir_id := moving_dir;
+    SET @dir_lft := GetDirLeft(moving_dir);
+    SET @dir_rgt := GetDirRight(moving_dir);
+    SET @parent_id := new_parent_id;
+    SET @parent_rgt := GetDirRight(new_parent_id);
+    SET @dir_size := @dir_rgt - @dir_lft + 1;
+
+    UPDATE directory
+    SET lft  = 0 - lft,
+        rgt = 0 - rgt
+    WHERE lft >= @dir_lft
+      AND rgt <= @dir_rgt;
+
+-- step 2: decrease left and/or right position values of currently 'lower' items (and parents)
+
+    UPDATE directory
+    SET lft = lft - @dir_size
+    WHERE lft > @dir_rgt;
+    UPDATE directory
+    SET rgt = rgt - @dir_size
+    WHERE rgt > @dir_rgt;
+
+-- step 3: increase left and/or right position values of future 'lower' items (and parents)
+
+    UPDATE directory
+    SET lft = lft + @dir_size
+    WHERE lft >= IF(@parent_rgt > @dir_rgt, @parent_rgt - @dir_size, @parent_rgt);
+    UPDATE directory
+    SET rgt = rgt + @dir_size
+    WHERE rgt >= IF(@parent_rgt > @dir_rgt, @parent_rgt - @dir_size, @parent_rgt);
+
+-- step 4: move node (ant it's subnodes) and update it's parent item id
+
+    UPDATE directory
+    SET lft  = 0 - lft + IF(@parent_rgt > @dir_rgt, @parent_rgt - @dir_rgt - 1,
+                                            @parent_rgt - @dir_rgt - 1 + @dir_size),
+        rgt = 0 - rgt + IF(@parent_rgt > @dir_rgt, @parent_rgt - @dir_rgt - 1,
+                                             @parent_rgt - @dir_rgt - 1 + @dir_size)
+    WHERE lft <= 0 - @dir_lft
+      AND rgt >= 0 - @dir_rgt;
+END;
+
+DROP PROCEDURE MoveDirectory;
+
+CALL MoveDirectory(2, 6);
 
 # Скопировать данные, удалить, вставить на новое место с теми же данными
 # Или нужно перемещать поддерево?
