@@ -54,7 +54,7 @@ SELECT name,
        rgt,
        depth
 FROM directory
-WHERE subtree_size(name) = 0;
+WHERE subtree_size(name) = 4;
 
 # 3. Вывода списка родителей
 SELECT parent.name,
@@ -169,7 +169,7 @@ DROP PROCEDURE IF EXISTS DeleteDirectory;
 
 BEGIN;
 
-CALL DeleteDirectory('New Folder 3');
+CALL DeleteDirectory('New Folder 7');
 
 ROLLBACK;
 
